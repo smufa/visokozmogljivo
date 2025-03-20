@@ -4,7 +4,12 @@
 
 // Carve function now uses the Image class
 Image carve(const Image& img, int pixels_to_remove) {
-
+    auto current = img;
+    for(int i = 0; i < pixels_to_remove; i++) {
+        auto seams = id_seams_seq(calc_energy_seq(current));
+        current = rem_seam_seq(current, seams);
+    }
+    return current;
 }
 
 int main(int argc, char* argv[]) {

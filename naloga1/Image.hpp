@@ -103,17 +103,29 @@ public:
 
     // Indexing function (channel, x, y)
     float& at(int c, int x, int y) {
-        if (c < 0 || c >= channels || x < 0 || x >= width || y < 0 || y >= height) {
-            throw std::out_of_range("Image index out of range");
+        // Check if channel is valid
+        if (c < 0 || c >= channels) {
+            throw std::out_of_range("Channel index out of range");
         }
-        return data[(y * width + x) * channels + c];
+        
+        // Clamp x and y coordinates to valid image boundaries
+        int nx = std::max(0, std::min(width - 1, x));
+        int ny = std::max(0, std::min(height - 1, y));
+        
+        return data[(ny * width + nx) * channels + c];
     }
-
+    
     const float& at(int c, int x, int y) const {
-        if (c < 0 || c >= channels || x < 0 || x >= width || y < 0 || y >= height) {
-            throw std::out_of_range("Image index out of range");
+        // Check if channel is valid
+        if (c < 0 || c >= channels) {
+            throw std::out_of_range("Channel index out of range");
         }
-        return data[(y * width + x) * channels + c];
+        
+        // Clamp x and y coordinates to valid image boundaries
+        int nx = std::max(0, std::min(width - 1, x));
+        int ny = std::max(0, std::min(height - 1, y));
+        
+        return data[(ny * width + nx) * channels + c];
     }
 
     // Set pixel value at (c, x, y)
@@ -124,6 +136,34 @@ public:
     // Fill the entire image with a specific value
     void fill(float value) {
         std::fill(data.begin(), data.end(), value);
+    }
+
+    // Normalize image data to range 0-1
+    void normalize() {
+        if (data.empty()) return;
+        
+        // Find min and max values across all channels
+        float min_val = data[0];
+        float max_val = data[0];
+        
+        for (const float& val : data) {
+            min_val = std::min(min_val, val);
+            max_val = std::max(max_val, val);
+        }
+        
+        // If max equals min, avoid division by zero
+        if (max_val == min_val) {
+            // If all values are the same, set to 0 or 1 depending on value
+            float normalized_val = (min_val > 0.5f) ? 1.0f : 0.0f;
+            std::fill(data.begin(), data.end(), normalized_val);
+            return;
+        }
+        
+        // Normalize all values to 0-1 range
+        float range = max_val - min_val;
+        for (float& val : data) {
+            val = (val - min_val) / range;
+        }
     }
 
     int getWidth() const { return width; }
