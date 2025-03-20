@@ -1,0 +1,9 @@
+.bash_history
+.bash_profile
+.cache/
+.vscode-oss/
+.bash_logout
+.bashrc
+.config/
+.local/
+.pki/
