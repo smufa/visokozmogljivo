@@ -11,7 +11,12 @@ Image carve(const Image &img, int pixels_to_remove)
     {
         auto energy = calc_energy_seq(current);
         auto seams = id_seams_par(energy);
+        seams.normalize();
         seams.save("testout.png");
+
+        auto seams2 = id_seams_seq(energy);
+        seams2.normalize();
+        seams2.save("testout2.png");
         current = rem_seam_seq(current, seams);
     }
     return current;
