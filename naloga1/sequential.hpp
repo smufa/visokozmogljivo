@@ -56,26 +56,35 @@ inline Image id_seams_seq(Image energy) {
 
 inline Image rem_seam_seq(Image in, Image seams) {
   Image out(in.getWidth() - 1, in.getHeight(), in.getChannels());
+  std::vector<int> seam(in.getHeight());
+
+  // Find start of seam
   float seam_score = std::numeric_limits<float>::infinity();
-  int seam_index;
+  int seam_start;
   for (int x = 0; x < in.getWidth(); x++) {
-    if (seams.at(0, x, in.getHeight() - 1) < seam_score) {
-      seam_score = seams.at(0, x, in.getHeight() - 1);
-      seam_index = x;
+    if (seams.at(0, x, 0) < seam_score) {
+      seam_score = seams.at(0, x, 0);
+      seam[0] = x;
     }
   }
-  for (int y = in.getHeight() - 2; y > 0; y--) {
+
+  // Find entire seam
+  for (int y = 1; y < in.getHeight(); y++) {
+    if (seams.at(0, seam[y - 1], y) < seams.at(0, seam[y - 1] - 1, y) &&
+        seams.at(0, seam[y - 1], y) < seams.at(0, seam[y - 1] + 1, y)) {
+      seam[y] = seam[y - 1];
+    } else if (seams.at(0, seam[y - 1] - 1, y) <
+               seams.at(0, seam[y - 1] + 1, y)) {
+      seam[y] = seam[y - 1] - 1;
+    } else {
+      seam[y] = seam[y - 1] + 1;
+    }
+  }
+
+  for (int y = 0; y < in.getHeight(); y++) {
     bool skipped = false;
-    for (int x = 0; x < out.getWidth(); x++) {
-      if (!skipped && x == seam_index) {
-        if (seams.at(0, x - 1, y - 1) < seams.at(0, x, y - 1) &&
-            seams.at(0, x - 1, y - 1) < seams.at(0, x + 1, y - 1)) {
-          seam_index = x - 1;
-        } else if (seams.at(0, x, y - 1) < seams.at(0, x + 1, y - 1)) {
-          seam_index = x;
-        } else {
-          seam_index = x + 1;
-        }
+    for (int x = 0; x < in.getWidth(); x++) {
+      if (x == seam[y]) {
         skipped = true;
       } else {
         for (int c = 0; c < out.getChannels(); c++) {

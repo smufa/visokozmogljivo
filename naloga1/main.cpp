@@ -16,16 +16,16 @@ Image carve(const Image &img, int pixels_to_remove) {
   t1 = high_resolution_clock::now();
   for (int i = 0; i < pixels_to_remove; i++) {
     t2 = high_resolution_clock::now();
-    auto energy = calc_energy_seq(current);
+    auto energy = calc_energy_par(current);
     t3 = high_resolution_clock::now();
 
-    auto seams = id_seams_seq(energy);
+    auto seams = id_seams_par(energy);
     t4 = high_resolution_clock::now();
 
-    current = rem_seam_seq(current, seams);
+    current = rem_seam_par(current, seams);
     t5 = high_resolution_clock::now();
-    seams.normalize();
-    seams.save("testout.png");
+    // seams.normalize();
+    // seams.save("testout.png");
   }
   t5 = high_resolution_clock::now();
 
