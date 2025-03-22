@@ -12,4 +12,7 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 g++ -O2 -lm --openmp main.cpp -o carve
 
-srun carve valve.png valve_out.png
+for file in 720x480.png 1024x768.png 1920x1200.png 3840x2160.png 7680x4320.png
+do
+  srun "carve test_image/$file results/$file 128"
+done
