@@ -34,7 +34,7 @@ inline Image calc_energy_par(Image in)
 inline Image id_seams_par(Image energy)
 {
   Image out(energy.getWidth(), energy.getHeight(), energy.getChannels());
-  const int num_triangles = 2;
+  const int num_triangles = 4;
   const int strip_size = (out.getWidth() / num_triangles) / 2; // half of full traingle base
   const int strips = energy.getHeight() / strip_size;
   printf("strip size: %d, strips: %d\n", strip_size, strips);
@@ -69,7 +69,7 @@ inline Image id_seams_par(Image energy)
                   energy.at(0, i, prev_layer)),
               energy.at(0, i + 1, prev_layer));
 
-          out.set(0, i, prev_layer + 1, 255);
+          out.set(0, i, prev_layer + 1, 1.0);
           // out.set(0, i, prev_layer + 1, min_previous_layer + energy.at(0, i, prev_layer + 1));
         }
         level += 1;
@@ -80,37 +80,38 @@ inline Image id_seams_par(Image energy)
 
     // barier ? all threads have computed all the triangles in a strip
 
-    // // compute down facing triangles
-    // for (int triangle_index = 0; triangle_index < num_triangles; triangle_index++)
-    // {
-    //   // each thread should compute the triangle
-    //   // compute the triangle untill the width at the top is 0
-    //   int triangle_width = 2;
-    //   int level = strip_from + 1; // since the bottom layer was computed by up-facing triangle; +1 is the new level we compute
-    //   const int max_triangle_width = out.getWidth() / num_triangles;
+    // compute down facing triangles
+    for (int triangle_index = 0; triangle_index <= num_triangles; triangle_index++)
+    {
+      // each thread should compute the triangle
+      // compute the triangle untill the width at the top is 0
+      int triangle_width = 2;
+      int global_level = strip_from + 1; // since the bottom layer was computed by up-facing triangle; +1 is the new level we compute
+      const int max_triangle_width = out.getWidth() / num_triangles;
 
-    //   while (triangle_width < max_triangle_width) // increase the triangle size by 2, building upwards.
-    //   {
-    //     // from / to in x axis
-    //     int from = triangle_index * max_triangle_width - level;         // calculate the from index (negative for first triangle)
-    //     const int to = std::max(from + triangle_width, out.getWidth()); // calculate real to
-    //     from = std::min(from, 0);                                       // correct the from, to work on first triangle too
+      while (triangle_width < max_triangle_width) // increase the triangle size by 2, building upwards.
+      {
+        // from / to in x axis
+        int from = triangle_index * max_triangle_width - (global_level - strip_from); // calculate the from index (negative for first triangle)
+        const int to = std::min(from + triangle_width, out.getWidth());               // calculate real to
+        from = std::max(from, 0);                                                     // correct the from, to work on first triangle too
 
-    //     for (int i = from; i < to; i++)
-    //     {
-    //       const int prev_layer = out.getHeight() - level - 1;
-    //       const float min_previous_layer = std::min(
-    //           std::min(
-    //               energy.at(0, i - 1, prev_layer),
-    //               energy.at(0, i, prev_layer)),
-    //           energy.at(0, i + 1, prev_layer));
+        for (int i = from; i < to; i++)
+        {
+          const int prev_layer = out.getHeight() - global_level - 1;
+          const float min_previous_layer = std::min(
+              std::min(
+                  energy.at(0, i - 1, prev_layer),
+                  energy.at(0, i, prev_layer)),
+              energy.at(0, i + 1, prev_layer));
 
-    //       out.set(0, i, prev_layer + 1, min_previous_layer + energy.at(0, i, prev_layer + 1));
-    //     }
-    //     level += 1;
-    //     triangle_width += 2;
-    //   }
-    // }
+          // out.set(0, i, prev_layer + 1, min_previous_layer + energy.at(0, i, prev_layer + 1));
+          out.set(0, i, prev_layer + 1, 0.5);
+        }
+        global_level += 1;
+        triangle_width += 2;
+      }
+    }
   }
 
   //   float seam_score = std::numeric_limits<float>::infinity();
