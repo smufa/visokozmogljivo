@@ -123,14 +123,14 @@ public:
             throw std::out_of_range("Channel index out of range");
         }
 
-        if (y > height)
-        {
-            printf("y: %d is over height\n");
-        }
-        if (y < 0)
-        {
-            printf("y: %d is under 0\n");
-        }
+        // if (y > height)
+        // {
+        //     printf("y: %d is over height\n");
+        // }
+        // if (y < 0)
+        // {
+        //     printf("y: %d is under 0\n");
+        // }
         // Clamp x and y coordinates to valid image boundaries
         int nx = std::max(0, std::min(width - 1, x));
         int ny = std::max(0, std::min(height - 1, y));
