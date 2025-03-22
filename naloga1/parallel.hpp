@@ -140,7 +140,7 @@ inline Image id_seams_par(Image energy) {
               out.set(0, i, write_layer,
                       min_previous_layer + out.at(0, i, write_layer));
               // out.set(0, i, write_layer, 0.5);
-              // out.set(0, i, read_layer, 0.4);
+              // out.set(0, i, read_layer, 0.2);
             }
             global_level += 1;
             triangle_width += 2;
