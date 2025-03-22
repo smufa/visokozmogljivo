@@ -1,18 +1,43 @@
 #include "Image.hpp"
 #include "parallel.hpp"
 #include "sequential.hpp"
+#include <chrono>
 #include <iostream>
+
+using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
+using std::chrono::milliseconds;
 
 // Carve function now uses the Image class
 Image carve(const Image &img, int pixels_to_remove) {
   auto current = img;
+  std::chrono::time_point<std::chrono::system_clock> t1, t2, t3, t4, t5;
+  t1 = high_resolution_clock::now();
   for (int i = 0; i < pixels_to_remove; i++) {
+    t2 = high_resolution_clock::now();
     auto energy = calc_energy_seq(current);
-    auto seams = id_seams_par(energy);
+    t3 = high_resolution_clock::now();
+
+    auto seams = id_seams_seq(energy);
+    t4 = high_resolution_clock::now();
+
+    current = rem_seam_seq(current, seams);
+    t5 = high_resolution_clock::now();
     seams.normalize();
     seams.save("testout.png");
-    current = rem_seam_seq(current, seams);
   }
+  t5 = high_resolution_clock::now();
+
+  auto ms_int_ene = duration_cast<milliseconds>(t3 - t2);
+  auto ms_int_seams = duration_cast<milliseconds>(t4 - t3);
+  auto ms_int_rem = duration_cast<milliseconds>(t5 - t4);
+  std::cout << "Energy: " << ms_int_ene.count() << "ms\n";
+  std::cout << "Seam process: " << ms_int_seams.count() << "ms\n";
+  std::cout << "Seam energy: " << ms_int_rem.count() << "ms\n";
+
+  auto ms_int = duration_cast<milliseconds>(t5 - t1);
+  std::cout << "Cumulative: " << ms_int.count() << "ms\n";
   return current;
 }
 

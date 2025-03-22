@@ -29,7 +29,7 @@ inline Image calc_energy_par(Image in) {
 
 inline Image id_seams_par(Image energy) {
   Image out = energy;
-  const int num_triangles = 20;
+  const int num_triangles = 12;
   const int strip_size =
       std::ceil(((float)out.getWidth() / (float)num_triangles) /
                 2.0); // half of full traingle base
@@ -44,7 +44,7 @@ inline Image id_seams_par(Image energy) {
     for (int strip = 0; strip < strips; strip++) {
       // calculate y boundaries for strips processing currently
       const int strip_from = strip * strip_size + 1;
-      // #pragma omp parallel
+      // #pragma omp parallel -- WHY NO WORK?
       {
 
         // const int strip_to = std::min(strip_from + strip_size - 1,
