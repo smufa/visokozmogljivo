@@ -61,3 +61,8 @@ This allows every thread to process its own pixel, which gives a theoretic maxim
 We believe that this is the best approach and gives no further space for improvements, due to its efficiency and simplicity of the task.
 
 ### Seam identification
+
+
+### Seam removal
+
+ENEI NAREDI TO PROSIM <3
