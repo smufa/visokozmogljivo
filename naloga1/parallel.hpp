@@ -2,13 +2,16 @@
 #define PARALLEL_HPP
 #include "Image.hpp"
 #include <omp.h>
+#include <vector>
 
 inline Image calc_energy_par(Image in) {
   Image out(in.getWidth(), in.getHeight(), 1);
 
+  const int width = in.getWidth();
+  const int height = in.getHeight();
 #pragma omp parallel for collapse(2) schedule(dynamic)
-  for (int x = 0; x < in.getWidth(); x++) {
-    for (int y = 0; y < in.getHeight(); y++) {
+  for (int x = 0; x < width; x++) {
+    for (int y = 0; y < height; y++) {
       std::vector<float> energies = {0, 0, 0};
       for (int c = 0; c < in.getChannels(); c++) {
         energies[c] = std::sqrt(
@@ -29,7 +32,7 @@ inline Image calc_energy_par(Image in) {
 
 inline Image id_seams_par(Image energy) {
   Image out = energy;
-  const int num_triangles = 12;
+  const int num_triangles = 20;
   const int strip_size =
       std::ceil(((float)out.getWidth() / (float)num_triangles) /
                 2.0); // half of full traingle base
@@ -44,7 +47,7 @@ inline Image id_seams_par(Image energy) {
     for (int strip = 0; strip < strips; strip++) {
       // calculate y boundaries for strips processing currently
       const int strip_from = strip * strip_size + 1;
-      // #pragma omp parallel -- WHY NO WORK?
+      // #pragma omp parallel
       {
 
         // const int strip_to = std::min(strip_from + strip_size - 1,
@@ -150,5 +153,46 @@ inline Image id_seams_par(Image energy) {
   return out;
 }
 
-inline Image rem_seam_par(Image in, Image seams) { return in; }
+inline Image rem_seam_par(Image in, Image seams) {
+  Image out(in.getWidth() - 1, in.getHeight(), in.getChannels());
+  std::vector<int> seam(in.getHeight());
+
+  // Find start of seam
+  float seam_score = std::numeric_limits<float>::infinity();
+  for (int x = 0; x < in.getWidth(); x++) {
+    if (seams.at(0, x, 0) < seam_score) {
+      seam_score = seams.at(0, x, 0);
+      seam[0] = x;
+    }
+  }
+
+  // Find entire seam
+  for (int y = 1; y < in.getHeight(); y++) {
+    if (seams.at(0, seam[y - 1], y) < seams.at(0, seam[y - 1] - 1, y) &&
+        seams.at(0, seam[y - 1], y) < seams.at(0, seam[y - 1] + 1, y)) {
+      seam[y] = seam[y - 1];
+    } else if (seams.at(0, seam[y - 1] - 1, y) <
+               seams.at(0, seam[y - 1] + 1, y)) {
+      seam[y] = seam[y - 1] - 1;
+    } else {
+      seam[y] = seam[y - 1] + 1;
+    }
+  }
+
+  const int height = in.getHeight();
+#pragma omp parallel for schedule(static)
+  for (int y = 0; y < height; y++) {
+    bool skipped = false;
+    for (int x = 0; x < in.getWidth(); x++) {
+      if (x == seam[y]) {
+        skipped = true;
+      } else {
+        for (int c = 0; c < out.getChannels(); c++) {
+          out.set(c, skipped ? x - 1 : x, y, in.at(c, x, y));
+        }
+      }
+    }
+  }
+  return out;
+}
 #endif // PARALLEL_HPP
