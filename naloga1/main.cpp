@@ -24,8 +24,8 @@ Image carve(const Image &img, int pixels_to_remove) {
 
     current = rem_seam_par(current, seams);
     t5 = high_resolution_clock::now();
-    // seams.normalize();
-    // seams.save("testout.png");
+    seams.normalize();
+    seams.save("testout.png");
   }
   t5 = high_resolution_clock::now();
 
