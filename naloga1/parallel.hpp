@@ -41,7 +41,8 @@ inline Image id_seams_par(Image energy)
   const int strips = out.getHeight() / strip_size;
   printf("strip size: %d, strips: %d\n", strip_size, strips);
 
-  // divide the image in (NON)equal horizontal strips
+// divide the image in (NON)equal horizontal strips
+#pragma omp parallel for collapse(2)
   for (int strip = 0; strip * strip_size < out.getHeight(); strip++)
   {
     // calculate y boundaries for strips processing currently
