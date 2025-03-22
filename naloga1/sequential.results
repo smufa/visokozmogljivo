@@ -1,0 +1,25 @@
+720x480.png
+Energy: 15ms
+Seam process: 1ms
+Seam energy: 3ms
+Cumulative: 3725ms
+1024x768.png
+Energy: 37ms
+Seam process: 3ms
+Seam energy: 9ms
+Cumulative: 7318ms
+1920x1200.png
+Energy: 119ms
+Seam process: 13ms
+Seam energy: 30ms
+Cumulative: 23032ms
+3840x2160.png
+Energy: 607ms
+Seam process: 52ms
+Seam energy: 117ms
+Cumulative: 99077ms
+7680x4320.png
+Energy: 2285ms
+Seam process: 200ms
+Seam energy: 480ms
+Cumulative: 428455ms
