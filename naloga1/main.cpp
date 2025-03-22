@@ -19,7 +19,7 @@ Image carve(const Image &img, int pixels_to_remove) {
     auto energy = calc_energy_seq(current);
     t3 = high_resolution_clock::now();
 
-    auto seams = id_seams_seq(energy);
+    auto seams = id_seams_par(energy);
     t4 = high_resolution_clock::now();
 
     current = rem_seam_seq(current, seams);
