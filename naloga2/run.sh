@@ -1,7 +1,6 @@
 #!/bin/bash
 
 #SBATCH --partition=gpu
-#SBATCH --reservation=fri
 #SBATCH --job-name=code_sample
 #SBATCH --gpus=1
 #SBATCH --output=sample_out.log

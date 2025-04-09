@@ -1,90 +1,121 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <cuda_runtime.h>
-#include <cuda.h>
 #include "helper_cuda.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image.h"
-#include "stb_image_write.h"
+#include "Image.hpp"
 
 #define COLOR_CHANNELS 0
 
-__global__ void copy_image(const unsigned char *imageIn, unsigned char *imageOut, const int width, const int height, const int cpp)
-{
+struct gpuImage {
+  int width;
+  int height;
+  int channels;
+  float *data;
+};
 
-    int gidx = blockDim.x * blockIdx.x + threadIdx.x;
-    int gidy = blockDim.y * blockIdx.y + threadIdx.y;
-    if (gidx == 0 & gidy == 0)
-    {
-        printf("DEVICE: START COPY\n");
+__device__ float at(gpuImage img, int x, int y, int c) {
+    // Check bounds
+    if (x < 0 || x >= img.width || y < 0 || y >= img.height || c < 0 || c >= img.channels) {
+        // Handle out-of-bounds access
+        static float dummy = 0.0f;
+        return dummy; // Return reference to dummy variable for out-of-bounds
     }
-    for (int i = gidx; i < height; i += blockDim.x * gridDim.x)
-    {
-        for (int j = gidy; j < width; j += blockDim.y * gridDim.y)
-        {
-            for (int c = 0; c < cpp; c += 1)
-            {
-                imageOut[(i * width + j) * cpp + c] = imageIn[(i * width + j) * cpp + c];
-            }
-        }
-    }
+    
+    // Calculate the index in the 1D array
+    // Layout: data is stored with all channels of a pixel together, then moving to the next pixel
+    int index = (y * img.width + x) * img.channels + c;
+    
+    return img.data[index];
+}
+
+
+__global__ void rgb_to_yuv(const gpuImage in_img, gpuImage out_img) {
 
 }
 
-int main(int argc, char *argv[])
-{
-
-    if (argc < 3)
-    {
-        printf("USAGE: sample input_image output_image\n");
-        exit(EXIT_FAILURE);
+gpuImage allocateImageOnGPU(const Image& img) {
+    gpuImage out_img;
+    out_img.width = img.getWidth();
+    out_img.height = img.getHeight();
+    out_img.channels = img.getChannels();
+    cudaError_t err = cudaMalloc(&out_img.data, img.getDataSize());
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Failed to allocate CUDA memory: " + 
+                                std::string(cudaGetErrorString(err)));
     }
 
-    char szImage_in_name[255];
-    char szImage_out_name[255];
-
-    snprintf(szImage_in_name, 255, "%s", argv[1]);
-    snprintf(szImage_out_name, 255, "%s", argv[2]);
-
-    // Load image from file and allocate space for the output image
-    int width, height, cpp;
-    unsigned char *h_imageIn = stbi_load(szImage_in_name, &width, &height, &cpp, COLOR_CHANNELS);
-
-    if (h_imageIn == NULL)
-    {
-        printf("Error reading loading image %s!\n", szImage_in_name);
-        exit(EXIT_FAILURE);
+    // Copy data from host to device
+    const std::vector<float>& hostData = img.getData();
+    err = cudaMemcpy(out_img.data, hostData.data(), img.getDataSize(), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+        // Free allocated memory before throwing
+        cudaFree(out_img.data);
+        throw std::runtime_error("Failed to copy data to CUDA memory: " + 
+                                std::string(cudaGetErrorString(err)));
     }
-    printf("Loaded image %s of size %dx%d.\n", szImage_in_name, width, height);
-    const size_t datasize = width * height * cpp * sizeof(unsigned char);
-    unsigned char *h_imageOut = (unsigned char *)malloc(datasize);
+    
+    return out_img;
+}
 
+Image retrieveImageFromGPU(const gpuImage& gpu_img) {
+    // Create a new host image with the same dimensions
+    Image host_img(gpu_img.width, gpu_img.height, gpu_img.channels);
+    
+    // Get a reference to the host data vector for direct access
+    const std::vector<float>& hostData = host_img.getData();
+    
+    // Calculate the size of data to copy
+    size_t dataSize = gpu_img.width * gpu_img.height * gpu_img.channels * sizeof(float);
+    
+    // Copy data from device to host
+    cudaError_t err = cudaMemcpy(const_cast<float*>(hostData.data()), 
+                                gpu_img.data, 
+                                dataSize, 
+                                cudaMemcpyDeviceToHost);
+    
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Failed to copy data from CUDA memory: " + 
+                                std::string(cudaGetErrorString(err)));
+    }
+    
+    return host_img;
+}
+
+int main(int argc, char *argv[]) {
+
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " <input> <output>\n";
+    return EXIT_FAILURE;
+  }
+
+  // Process parameters
+  std::string input_filename = argv[1];
+  std::string output_filename = argv[2];
+
+  try {
+    // Load image
+    Image input = Image::load(input_filename);
+
+    // Process image
     // Setup Thread organization
     dim3 blockSize(16, 16);
-    dim3 gridSize((height-1)/blockSize.x+1,(width-1)/blockSize.y+1);
-    //dim3 gridSize(1, 1);
+    dim3 gridSize((input.getHeight() - 1) / blockSize.x + 1,
+                  (input.getWidth() - 1) / blockSize.y + 1);
+    // dim3 gridSize(1, 1);
 
-    unsigned char *d_imageIn;
-    unsigned char *d_imageOut;
-
-    // Allocate memory on the device
-    checkCudaErrors(cudaMalloc(&d_imageIn, datasize));
-    checkCudaErrors(cudaMalloc(&d_imageOut, datasize));
-
+    
     // Use CUDA events to measure execution time
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
-
+    
     // Copy image to device and run kernel
     cudaEventRecord(start);
-    checkCudaErrors(cudaMemcpy(d_imageIn, h_imageIn, datasize, cudaMemcpyHostToDevice));
-    copy_image<<<gridSize, blockSize>>>(d_imageIn, d_imageOut, width, height, cpp);
-    checkCudaErrors(cudaMemcpy(h_imageOut, d_imageOut, datasize, cudaMemcpyDeviceToHost));
-    getLastCudaError("copy_image() execution failed\n");
+    gpuImage imageIn = allocateImageOnGPU(input);
+    gpuImage imageOut = allocateImageOnGPU(input);
     cudaEventRecord(stop);
 
     cudaEventSynchronize(stop);
@@ -94,37 +125,14 @@ int main(int argc, char *argv[])
     cudaEventElapsedTime(&milliseconds, start, stop);
     printf("Kernel Execution time is: %0.3f milliseconds \n", milliseconds);
 
-    // Write the output file
-    char szImage_out_name_temp[255];
-    strncpy(szImage_out_name_temp, szImage_out_name, 255);
-    char *token = strtok(szImage_out_name_temp, ".");
-    char *FileType = NULL;
-    while (token != NULL)
-    {
-        FileType = token;
-        token = strtok(NULL, ".");
-    }
+    Image output = retrieveImageFromGPU(imageOut);
+    output.save(output_filename);
+    cudaFree(imageOut.data);
 
-    if (!strcmp(FileType, "png"))
-        stbi_write_png(szImage_out_name, width, height, cpp, h_imageOut, width * cpp);
-    else if (!strcmp(FileType, "jpg"))
-        stbi_write_jpg(szImage_out_name, width, height, cpp, h_imageOut, 100);
-    else if (!strcmp(FileType, "bmp"))
-        stbi_write_bmp(szImage_out_name, width, height, cpp, h_imageOut);
-    else
-        printf("Error: Unknown image format %s! Only png, bmp, or bmp supported.\n", FileType);
+  } catch (const std::exception &e) {
+    std::cerr << e.what() << std::endl;
+    return EXIT_FAILURE;
+  }
 
-    // Free device memory
-    checkCudaErrors(cudaFree(d_imageIn));
-    checkCudaErrors(cudaFree(d_imageOut));
-
-    // Clean-up events
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
-
-    // Free host memory
-    free(h_imageIn);
-    free(h_imageOut);
-
-    return 0;
+  return EXIT_SUCCESS;
 }
