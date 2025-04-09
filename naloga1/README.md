@@ -111,3 +111,15 @@ We used the `#pragma omp parallel for` for optimizing the for loop over the vert
 
 We have timed the cumulative runtime along with the time it took for each section to complete.
 
+| Image Size     | Mode      | Energy (ms) | Seam Process (ms) | Seam Energy (ms) | Cumulative (ms) |
+|----------------|-----------|-------------|-------------------|------------------|-----------------|
+| 720x480.png    | Sequential| 15          | 1                 | 3                | 3725            |
+| 720x480.png    | Parallel  | 11          | 2                 | 2                | 2774            |
+| 1024x768.png   | Sequential| 37          | 3                 | 9                | 7318            |
+| 1024x768.png   | Parallel  | 29          | 3                 | 5                | 5519            |
+| 1920x1200.png  | Sequential| 119         | 13                | 30               | 23032           |
+| 1920x1200.png  | Parallel  | 60          | 6                 | 12               | 13618           |
+| 3840x2160.png  | Sequential| 607         | 52                | 117              | 99077           |
+| 3840x2160.png  | Parallel  | 360         | 30                | 60               | 59000           |
+| 7680x4320.png  | Sequential| 2285        | 200               | 480              | 428455          |
+| 7680x4320.png  | Parallel  | 1431        | 94                | 245              | 230231          |
