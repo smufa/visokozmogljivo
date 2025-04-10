@@ -32,7 +32,8 @@ inline Image calc_energy_par(Image in) {
 
 inline Image id_seams_par(Image energy) {
   Image out = energy;
-  const int num_triangles = 20;
+  // 20, 2, 6, 12, 60, 2
+  const int num_triangles = 2;
   const int strip_size =
       std::ceil(((float)out.getWidth() / (float)num_triangles) /
                 2.0); // half of full traingle base
