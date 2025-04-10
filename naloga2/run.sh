@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --partition=gpu
-#SBATCH --job-name=code_sample
+#SBATCH --job-name=hpc-assignemnt
 #SBATCH --gpus=1
 #SBATCH --output=sample_out.log
 

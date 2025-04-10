@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "helper_cuda.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
 
@@ -17,23 +16,28 @@ struct gpuImage {
 };
 
 __device__ float at(gpuImage img, int x, int y, int c) {
-    // Check bounds
     if (x < 0 || x >= img.width || y < 0 || y >= img.height || c < 0 || c >= img.channels) {
-        // Handle out-of-bounds access
         static float dummy = 0.0f;
-        return dummy; // Return reference to dummy variable for out-of-bounds
+        return dummy; 
     }
     
-    // Calculate the index in the 1D array
-    // Layout: data is stored with all channels of a pixel together, then moving to the next pixel
     int index = (y * img.width + x) * img.channels + c;
     
     return img.data[index];
 }
 
+__device__ void set(gpuImage img, int x, int y, int c, float value) {
+  if (x < 0 || x >= img.width || y < 0 || y >= img.height || c < 0 || c >= img.channels) {
+      return; 
+  }
+  
+  int index = (y * img.width + x) * img.channels + c;
+  img.data[index] = value;
+}
+
 
 __global__ void rgb_to_yuv(const gpuImage in_img, gpuImage out_img) {
-
+    set(out_img, 1, 1, 0, at(in_img, 0, 0, 0));
 }
 
 gpuImage allocateImageOnGPU(const Image& img) {
@@ -41,7 +45,7 @@ gpuImage allocateImageOnGPU(const Image& img) {
     out_img.width = img.getWidth();
     out_img.height = img.getHeight();
     out_img.channels = img.getChannels();
-    cudaError_t err = cudaMalloc(&out_img.data, img.getDataSize());
+    cudaError_t err = cudaMalloc(&out_img.data, img.getDataSize() * sizeof(float));
     if (err != cudaSuccess) {
         throw std::runtime_error("Failed to allocate CUDA memory: " + 
                                 std::string(cudaGetErrorString(err)));
@@ -49,7 +53,7 @@ gpuImage allocateImageOnGPU(const Image& img) {
 
     // Copy data from host to device
     const std::vector<float>& hostData = img.getData();
-    err = cudaMemcpy(out_img.data, hostData.data(), img.getDataSize(), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(out_img.data, hostData.data(), img.getDataSize() * sizeof(float), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) {
         // Free allocated memory before throwing
         cudaFree(out_img.data);
