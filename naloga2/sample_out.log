@@ -1,0 +1,4 @@
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+Loaded image valve.png of size 600x450.
+DEVICE: START COPY
+Kernel Execution time is: 142.892 milliseconds 
