@@ -1,0 +1,7 @@
+CompileFlags:
+  Add:
+    - -std=c++11
+    - --cuda-path=/cvmfs/sling.si/modules/el7/software/CUDA/12.8.0
+    - --cuda-gpu-arch=sm_61
+    - -L/cvmfs/sling.si/modules/el7/software/CUDA/12.8.0/lib64
+    - -I/cvmfs/sling.si/modules/el7/software/CUDA/12.8.0/include

@@ -1,3 +1,5 @@
 nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
-Failed to allocate CUDA memory: CUDA-capable device(s) is/are busy or unavailable
-srun: error: gwn01: task 0: Exited with exit code 1
+-------------- Starting GPU compute (CUDA) --------------
+Loaded image: 600x450 with 3 channels
+> Computation (kernel launch + execution) took: 0.573928s 
+> Saving the Histogram as PNG in 'gpu-out/600-450-gpu-hist.png'
