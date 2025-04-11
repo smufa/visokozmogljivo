@@ -1,0 +1,12 @@
+-------------- Starting CPU compute --------------
+Loaded image: 720x480 with 3 channels (164.7317 ms)
+RGB→YUV conversion: 2.0576 ms
+Histogram creation: 1.2765 ms
+Cumulative histogram: 0.0011 ms
+Luminance normalization: 1.1017 ms
+YUV→RGB conversion: 2.7840 ms
+Image saving: 44.8554 ms
+
+Total execution time: 217.0068 ms
+Total execution time per pixel: 0.0006 ms
+-------------- Processing complete --------------
