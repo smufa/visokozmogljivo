@@ -25,14 +25,88 @@ void drawColumn(unsigned char *image, int width, int height, int i, int value, i
 void drawHistogram(histogram H, int argWidth, int argHeight);
 void printHistogram(histogram H);
 
+__global__ void rgb_to_yuv(unsigned char *image, int width, int height) {
+    // Calculate pixel position
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    // Check if within image bounds
+    if (x < width && y < height) {
+        // Calculate the offset in the image array
+        int offset = (y * width + x) * 3; // 3 bytes per pixel (R,G,B)
+        
+        // Get RGB values
+        unsigned char R = image[offset];
+        unsigned char G = image[offset + 1];
+        unsigned char B = image[offset + 2];
+        
+        // Convert to YUV using the matrix from the formula
+        // [Y]   [  0.299      0.587      0.114   ] [R]   [ 0   ]
+        // [U] = [ -0.168736  -0.331264   0.5     ] [G] + [ 128 ]
+        // [V]   [  0.5       -0.418688  -0.081312] [B]   [ 128 ]
+        
+        // Calculate YUV values
+        unsigned char Y = (unsigned char)(0.299f * R + 0.587f * G + 0.114f * B);
+        unsigned char U = (unsigned char)(-0.168736f * R - 0.331264f * G + 0.5f * B + 128);
+        unsigned char V = (unsigned char)(0.5f * R - 0.418688f * G - 0.081312f * B + 128);
+        
+        // Store YUV values back in place of RGB
+        image[offset] = Y;
+        image[offset + 1] = U;
+        image[offset + 2] = V;
+    }
+}
+
+__global__ void yuv_to_rgb(unsigned char *image, int width, int height) {
+    // Calculate pixel position
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    // Check if within image bounds
+    if (x < width && y < height) {
+        // Calculate the offset in the image array
+        int offset = (y * width + x) * 3; // 3 bytes per pixel (Y,U,V)
+        
+        // Get YUV values
+        unsigned char Y = image[offset];
+        unsigned char U = image[offset + 1];
+        unsigned char V = image[offset + 2];
+        
+        // Adjust U and V by subtracting 128
+        float U_adj = U - 128.0f;
+        float V_adj = V - 128.0f;
+        
+        // Convert to RGB using the matrix from the formula
+        // [R]   [1      0          1.402   ] [  Y  ]
+        // [G] = [1  -0.344136  -0.714136   ] [U-128]
+        // [B]   [1    1.772        0       ] [V-128]
+        
+        // Calculate RGB values and clamp to [0, 255]
+        int R = Y + 1.402f * V_adj;
+        int G = Y - 0.344136f * U_adj - 0.714136f * V_adj;
+        int B = Y + 1.772f * U_adj;
+        
+        // Clamp values to valid range [0, 255]
+        R = max(0, min(255, R));
+        G = max(0, min(255, G));
+        B = max(0, min(255, B));
+        
+        // Store RGB values back in place of YUV
+        image[offset] = (unsigned char)R;
+        image[offset + 1] = (unsigned char)G;
+        image[offset + 2] = (unsigned char)B;
+    }
+}
+
+
 // -----------------------------------------------------------------------------
 // CUDA kernel (converted from OpenCL kernel)
 // -----------------------------------------------------------------------------
-__global__ void histogramKernel(unsigned char *image, unsigned int *H, int width, int height, int channels)
+__global__ void histogramKernel(unsigned char *image, unsigned int *H, int width, int height, int channel)
 {
     // Each block uses a shared buffer of size 256*3.
     // Here we assume each block is 16x16 = 256 threads, mapping 1-to-1.
-    __shared__ unsigned int buffer[256 * 3];
+    __shared__ unsigned int buffer[256];
     
     // Compute local (block) indices
     int l_i = threadIdx.x;
@@ -49,28 +123,18 @@ __global__ void histogramKernel(unsigned char *image, unsigned int *H, int width
     // Initialize shared memory. (There are 3 segments: for channels 1, 2 and 3)
     if (shared_idx < BINS) {
         buffer[shared_idx]         = 0;
-        buffer[shared_idx + BINS]    = 0;
-        buffer[shared_idx + 2 * BINS] = 0;
     }
     __syncthreads();
 
     // Process only if within image bounds
     if (global_i < height && global_j < width) {
         // The image is stored as channels per pixel (e.g., RGB or RGBA)
-        int offset = (global_i * width + global_j) * channels;
+        int offset = (global_i * width + global_j);
 
         // Note: The original OpenCL code uses atomic_inc.
         // In CUDA, we use atomicAdd (with value 1) to update the shared histogram.
-        if (channels >= 3) {
-            atomicAdd(&buffer[image[offset + 2]], 1);             // Blue channel
-            atomicAdd(&buffer[image[offset + 1] + BINS], 1);      // Green channel
-            atomicAdd(&buffer[image[offset] + 2 * BINS], 1);      // Red channel
-        } else if (channels == 1) {
-            // For grayscale images, use the same value for all channels
-            atomicAdd(&buffer[image[offset]], 1);                 // Blue channel
-            atomicAdd(&buffer[image[offset] + BINS], 1);          // Green channel
-            atomicAdd(&buffer[image[offset] + 2 * BINS], 1);      // Red channel
-        }
+        // For grayscale images, use the same value for all channels
+        atomicAdd(&buffer[image[offset]], 1);                 // Blue channel
     }
     
     __syncthreads();
@@ -78,8 +142,6 @@ __global__ void histogramKernel(unsigned char *image, unsigned int *H, int width
     // Each thread in the block updates the global histogram.
     if (shared_idx < BINS) {
         atomicAdd(&H[shared_idx], buffer[shared_idx]);
-        atomicAdd(&H[shared_idx + BINS], buffer[shared_idx + BINS]);
-        atomicAdd(&H[shared_idx + 2 * BINS], buffer[shared_idx + 2 * BINS]);
     }
 }
 
