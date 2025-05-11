@@ -204,8 +204,8 @@ histogramYUV createHistogram(unsigned char *image, int width, int height) {
 void inplaceCumulative(uint *buffer, int size) {
   for (int i = 1; i < size; i++) {
     int prev = buffer[i - 1];
-    buffer[i] += prev;
     // printf("buff: %d\n", buffer[i]);
+    buffer[i] += prev;
   }
 }
 
@@ -250,8 +250,6 @@ void inplaceNormalizeLuminance(unsigned char *image, int width, int height,
     }
   }
 }
-
-#include <time.h> // For clock_gettime
 
 // Helper function to get current time in milliseconds
 static double get_time_ms() {

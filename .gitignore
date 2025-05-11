@@ -9,5 +9,7 @@
 .pki/
 .ssh/known_hosts
 .ssh/known_hosts.old
+*.pdf
+*.zip
 naloga1/results
 naloga2/out
