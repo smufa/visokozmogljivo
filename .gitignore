@@ -9,3 +9,5 @@
 .pki/
 .ssh/known_hosts
 .ssh/known_hosts.old
+naloga1/results
+naloga2/out
