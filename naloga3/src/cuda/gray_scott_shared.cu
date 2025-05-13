@@ -17,45 +17,74 @@ __global__ void grayScottKernel(float *image, float *image_copy, int width,
                                 double diffusion_rate_b, double feed_rate,
                                 double kill_rate, // time_steps removed
                                 double delta_t) {
-  int x = blockIdx.x * blockDim.x + threadIdx.x;
-  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  extern __shared__ float s_mem[];
 
-  if (x < width && y < height) {
-    // Loop for time_steps removed from here
-    // Access pixel data here
-    float U = cudaImageAt(image, width, height, x, y, 0);
-    float V = cudaImageAt(image, width, height, x, y, 1);
+  int tile_dim_x_halo = blockDim.x + 2;
+  int tile_dim_y_halo = blockDim.y + 2;
+  int shared_mem_per_component = tile_dim_x_halo * tile_dim_y_halo;
 
-    // Calculate Laplacian
-    float laplacian_U = cudaImageAt(image, width, height, x + 1, y, 0) +
-                        cudaImageAt(image, width, height, x - 1, y, 0) +
-                        cudaImageAt(image, width, height, x, y + 1, 0) +
-                        cudaImageAt(image, width, height, x, y - 1, 0) -
-                        4.0f * U;
+  float* s_U = s_mem;
+  float* s_V = &s_mem[shared_mem_per_component];
 
-    float laplacian_V = cudaImageAt(image, width, height, x + 1, y, 1) +
-                        cudaImageAt(image, width, height, x - 1, y, 1) +
-                        cudaImageAt(image, width, height, x, y + 1, 1) +
-                        cudaImageAt(image, width, height, x, y - 1, 1) -
-                        4.0f * V;
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+  int tid_in_block = ty * blockDim.x + tx;
 
-    float UV2 = U * V * V;
+  // Load data into shared memory (U and V components)
+  for (int i = tid_in_block; i < shared_mem_per_component; i += blockDim.x * blockDim.y) {
+    int s_y_current = i / tile_dim_x_halo; // y-index in shared memory tile
+    int s_x_current = i % tile_dim_x_halo; // x-index in shared memory tile
 
-    cudaImageAt(image_copy, width, height, x, y, 0) =
-        U + (float)delta_t *
-                ((float)diffusion_rate_a * laplacian_U - UV2 + (float)feed_rate * (1 - U));
-    cudaImageAt(image_copy, width, height, x, y, 1) =
-        V + (float)delta_t * ((float)diffusion_rate_b * laplacian_V + UV2 -
-                       ((float)feed_rate + (float)kill_rate) * V);
+    // Global coordinates for this shared memory point
+    int gx_load = (blockIdx.x * blockDim.x) + s_x_current - 1;
+    int gy_load = (blockIdx.y * blockDim.y) + s_y_current - 1;
+
+    s_U[s_y_current * tile_dim_x_halo + s_x_current] = cudaImageAt(image, width, height, gx_load, gy_load, 0);
+    s_V[s_y_current * tile_dim_x_halo + s_x_current] = cudaImageAt(image, width, height, gx_load, gy_load, 1);
+  }
+  __syncthreads(); // Ensure all shared memory is loaded
+
+  // Global coordinates for the pixel this thread is responsible for
+  int gx = blockIdx.x * blockDim.x + tx;
+  int gy = blockIdx.y * blockDim.y + ty;
+
+  if (gx < width && gy < height) {
+    // Local indices for accessing the center of the 3x3 stencil in shared memory
+    int center_sx = tx + 1;
+    int center_sy = ty + 1;
+
+    float U_val = s_U[center_sy * tile_dim_x_halo + center_sx];
+    float V_val = s_V[center_sy * tile_dim_x_halo + center_sx];
+
+    // Calculate Laplacian using shared memory
+    float laplacian_U = s_U[center_sy * tile_dim_x_halo + (center_sx + 1)] +       // E
+                        s_U[center_sy * tile_dim_x_halo + (center_sx - 1)] +       // W
+                        s_U[(center_sy + 1) * tile_dim_x_halo + center_sx] +       // S
+                        s_U[(center_sy - 1) * tile_dim_x_halo + center_sx] -       // N
+                        4.0f * U_val;
+
+    float laplacian_V = s_V[center_sy * tile_dim_x_halo + (center_sx + 1)] +       // E
+                        s_V[center_sy * tile_dim_x_halo + (center_sx - 1)] +       // W
+                        s_V[(center_sy + 1) * tile_dim_x_halo + center_sx] +       // S
+                        s_V[(center_sy - 1) * tile_dim_x_halo + center_sx] -       // N
+                        4.0f * V_val;
+
+    float UV2 = U_val * V_val * V_val;
+
+    cudaImageAt(image_copy, width, height, gx, gy, 0) =
+        U_val + (float)delta_t *
+                ((float)diffusion_rate_a * laplacian_U - UV2 + (float)feed_rate * (1.0f - U_val));
+    cudaImageAt(image_copy, width, height, gx, gy, 1) =
+        V_val + (float)delta_t * ((float)diffusion_rate_b * laplacian_V + UV2 -
+                       ((float)feed_rate + (float)kill_rate) * V_val);
     __syncthreads();
-    // Swap buffers
     
-    cudaImageAt(image, width, height, x, y, 0) =
-        cudaImageAt(image_copy, width, height, x, y, 0);
-    cudaImageAt(image, width, height, x, y, 1) =
-        cudaImageAt(image_copy, width, height, x, y, 1);
+    // Swap buffers (still using global memory for this part)
+    cudaImageAt(image, width, height, gx, gy, 0) =
+        cudaImageAt(image_copy, width, height, gx, gy, 0);
+    cudaImageAt(image, width, height, gx, gy, 1) =
+        cudaImageAt(image_copy, width, height, gx, gy, 1);
     __syncthreads();
-    // Loop for time_steps removed from here
   }
 }
 
@@ -69,11 +98,11 @@ int main(int argc, char *argv[]) {
   int time_steps = 0;
   double delta_t = 0.0;
   std::string image_file = "";
-std::string output_file = "output_cuda.png";
+  std::string output_file = "output_cuda_shared.png";
 
-for (int i = 1; i < argc; ++i) {
-  std::string arg = argv[i];
-  if (arg == "--diffusion_rate_a") {
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if (arg == "--diffusion_rate_a") {
       diffusion_rate_a = std::stod(argv[++i]);
     } else if (arg == "--diffusion_rate_b") {
       diffusion_rate_b = std::stod(argv[++i]);
@@ -140,19 +169,21 @@ for (int i = 1; i < argc; ++i) {
       cudaEventSynchronize(stop_event);
       cudaEventElapsedTime(&milliseconds, start_event, stop_event);
       std::cout << "Memory copy to device time: " << milliseconds << " ms" << std::endl;
-      
+
       // Define kernel
       dim3 block_size(16, 16);
       dim3 grid_size((width + block_size.x - 1) / block_size.x,
                      (height + block_size.y - 1) / block_size.y);
+      
+      size_t shared_mem_size = 2 * (block_size.x + 2) * (block_size.y + 2) * sizeof(float);
 
       // Time kernel execution
       cudaEventRecord(start_event);
       for (int step = 0; step < time_steps; ++step) {
-        grayScottKernel<<<grid_size, block_size>>>(
+        grayScottKernel<<<grid_size, block_size, shared_mem_size>>>(
             d_image, d_image_copy, width, height, channels, diffusion_rate_a,
-            diffusion_rate_b, feed_rate, kill_rate, delta_t); // time_steps removed from call
-        // cudaDeviceSynchronize(); // Synchronize after each step // Not needed if timing the whole loop
+            diffusion_rate_b, feed_rate, kill_rate, delta_t);
+        // cudaDeviceSynchronize(); // Not needed if timing the whole loop
       }
       cudaEventRecord(stop_event);
       cudaEventSynchronize(stop_event); // Ensure all kernel launches are complete
@@ -169,7 +200,7 @@ for (int i = 1; i < argc; ++i) {
       std::cout << "Memory copy to host time: " << milliseconds << " ms" << std::endl;
 
       // Write image
-      writeImage(output_file.c_str(), width, height, channels, img);
+      writeImage(output_file.c_str(), width, height, channels, img); // Changed output filename
 
       // Free memory
       cudaEventDestroy(start_event);

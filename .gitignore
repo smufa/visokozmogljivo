@@ -13,3 +13,5 @@
 *.zip
 naloga1/results
 naloga2/out
+naloga3/cpu.out
+naloga3/cuda.out

@@ -1,0 +1,12 @@
+Gray-Scott CUDA implementation
+diffusion_rate_a: 0.16
+diffusion_rate_b: 0.08
+feed_rate: 0.06
+kill_rate: 0.062
+time_steps: 1000
+delta_t: 1
+image_file: data/start2048.png
+Loaded image: data/start2048.png (2048x2048, 2 channels)
+Memory copy to device time: 28.5802 ms
+Kernel execution time: 150.204 ms
+Memory copy to host time: 5.43389 ms

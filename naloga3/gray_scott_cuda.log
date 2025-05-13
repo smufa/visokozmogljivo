@@ -1,0 +1,12 @@
+nvcc -diag-suppress 550 -O2 -I/usr/local/cuda/include -Iinclude src/cuda/gray_scott_cuda.cu -o cuda.out
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+Running CUDA implementation...
+Gray-Scott CUDA implementation
+diffusion_rate_a: 0.16
+diffusion_rate_b: 0.08
+feed_rate: 0.06
+kill_rate: 0.062
+time_steps: 1000
+delta_t: 1
+image_file: data/square.png
+Loaded image: data/square.png (256x256, 2 channels)

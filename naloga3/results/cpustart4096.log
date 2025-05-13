@@ -1,0 +1,10 @@
+Gray-Scott CPU implementation
+diffusion_rate_a: 0.16
+diffusion_rate_b: 0.08
+feed_rate: 0.06
+kill_rate: 0.062
+time_steps: 1000
+delta_t: 1
+image_file: data/start4096.png
+Loaded image: data/start4096.png (4096x4096, 2 channels)
+Main loop execution time: 452250 ms
